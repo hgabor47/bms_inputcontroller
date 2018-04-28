@@ -256,13 +256,13 @@ namespace InputController
                 }
                 if (bms != null)
                 {
-                    sessiontranferpacket(outputpack); //lossy veszteséges a down és UP viszont nem
+                    sessiontransferpacket(outputpack); //lossy veszteséges a down és UP viszont nem
                     //bms.TransferPacket(session.writer, outputpack, true);
                 }
 
             }
 
-            private void sessiontranferpacket(BabylonMS.BMSPack outputpack)
+            private void sessiontransferpacket(BabylonMS.BMSPack outputpack)
             {
                 if (session.writelock.WaitOne(0))  //kimarad ha nem tudom elküldeni
                 {
