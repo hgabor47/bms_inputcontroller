@@ -1,4 +1,12 @@
-﻿using System;
+﻿/*
+ * 
+ *  Some cursor specific things
+ *  https://stackoverflow.com/questions/10541014/hiding-system-cursor
+ *  
+ */
+
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,15 +24,46 @@ using System.Threading;
 namespace InputController
 {
     class Program
-    {
-        
+    {        
+        public static bool TEST_INPUTCONTROLLER = false;
         static bool debug = true;
         static string shipUUID = "af675eb4-385e-4fda-a3a1-fdebd8901085";  //Input Controller UUID
         static BabylonMS.BabylonMS bms;
         static BabylonMS.BMSEventSessionParameter session=null;
+        static Point origo = new Point(-10000,-10000);
 
         static MouseHooker hook;
         // static int sensitivity = 1; //1.best but slow, 10 is quite well
+
+        static bool exitSystem = false;
+        [DllImport("Kernel32")]
+        private static extern bool SetConsoleCtrlHandler(EventHandler handler, bool add);
+        private delegate bool EventHandler(CtrlType sig);
+        static EventHandler _handler;
+        enum CtrlType
+        {
+            CTRL_C_EVENT = 0,
+            CTRL_BREAK_EVENT = 1,
+            CTRL_CLOSE_EVENT = 2,
+            CTRL_LOGOFF_EVENT = 5,
+            CTRL_SHUTDOWN_EVENT = 6
+        }
+        private static bool Handler(CtrlType sig)
+        {
+            Console.WriteLine("Exiting system due to external CTRL-C, or process kill, or shutdown");
+            try
+            {
+                User32.ShowMouse();
+            }
+            catch (Exception) { }
+            Console.WriteLine("Cleanup complete");
+            //allow main to run off
+            exitSystem = true;
+            //shutdown right away so there are no lingering threads
+            Environment.Exit(-1);
+            return true;
+        }
+
 
         public class Form1 : Form
         {
@@ -35,8 +74,12 @@ namespace InputController
         [STAThread]
         static void Main(string[] args)
         {
+            _handler += new EventHandler(Handler);
+            SetConsoleCtrlHandler(_handler, true);
 
             Application.EnableVisualStyles();
+            User32.HideMouse();
+            User32.ShowMouse();
 
             bms = BabylonMS.BabylonMS.ShipDocking(shipUUID, args);
             bms.Connected += Connected;
@@ -45,7 +88,12 @@ namespace InputController
             bms.Waitbytes += WaitBytes;
             bms.WaitBytesMS = 5;
             bms.OpenGate(false);//Client         
-            //BabylonMS.Util.setPriorityUp();            
+                                //BabylonMS.Util.setPriorityUp();            
+
+            if (TEST_INPUTCONTROLLER)
+            {
+                hook = new MouseHooker();
+            }
             
             Application.Run();
             //Application.Run(new Form1());
@@ -150,15 +198,17 @@ namespace InputController
                 storeMouseY = y;
                 VirtualMouseX = 0;
                 VirtualMouseY = 0;
-                User32.SetCursorPos(0, 0);
+                User32.SetCursorPos(origo.X, origo.Y);   //User32.SetCursorPos(0, 0);
                 User32.GetCursorPos(out p);
                 virtualOrigoX = p.X;
                 virtualOrigoY = p.Y;
+                User32.HideMouse();
             }
             public void restoreVirtualMousePosition()
             {
+                User32.ShowMouse();
                 User32.SetCursorPos(storeMouseX, storeMouseY);
-
+                
             }
 
 
@@ -241,11 +291,11 @@ namespace InputController
 
                 if (VirtualMouse)
                 {
+                    User32.SetCursorPos(origo.X,origo.Y);
                     MouseEventArgs e2;
-
-                    VirtualMouseX += e.X - virtualOrigoX;
-                    VirtualMouseY += e.Y - virtualOrigoY;
-                    User32.SetCursorPos(0, 0);
+                    VirtualMouseX += e.X-origo.X - virtualOrigoX;
+                    VirtualMouseY += e.Y-origo.Y - virtualOrigoY;
+                    
                     e2 = new MouseEventArgs(e.Button, e.Clicks, VirtualMouseX, VirtualMouseY, e.Delta);
                     AddToPack(outputpack, e2);
                     e.Handled = true;
@@ -415,13 +465,36 @@ namespace InputController
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT
         {
-            public int X;
-            public int Y;
+            public Int32 X;
+            public Int32 Y;
 
             public static implicit operator Point(POINT point)
             {
                 return new Point(point.X, point.Y);
             }
+        }
+        public enum SPIF
+
+        {
+
+            None = 0x00,
+            /// <summary>Writes the new system-wide parameter setting to the user profile.</summary>
+            SPIF_UPDATEINIFILE = 0x01,
+            /// <summary>Broadcasts the WM_SETTINGCHANGE message after updating the user profile.</summary>
+            SPIF_SENDCHANGE = 0x02,
+            /// <summary>Same as SPIF_SENDCHANGE.</summary>
+            SPIF_SENDWININICHANGE = 0x02
+        }
+        [StructLayout(LayoutKind.Sequential)]
+        struct CURSORINFO
+        {
+            public Int32 cbSize;        // Specifies the size, in bytes, of the structure. 
+                                        // The caller must set this to Marshal.SizeOf(typeof(CURSORINFO)).
+            public Int32 flags;         // Specifies the cursor state. This parameter can be one of the following values:
+                                        //    0             The cursor is hidden.
+                                        //    CURSOR_SHOWING    The cursor is showing.
+            public IntPtr hCursor;          // Handle to the cursor. 
+            public POINT ptScreenPos;       // A POINT structure that receives the screen coordinates of the cursor. 
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -434,5 +507,49 @@ namespace InputController
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        public static extern int ShowCursor(bool bShow);
+
+        public static uint SPI_SETCURSORS = 0x0057;
+        private const uint OCR_NORMAL = 32512;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, SPIF fWinIni); //SPI_SETCURSORS
+
+        [DllImport("user32.dll")]
+        public static extern bool SetSystemCursor(IntPtr hcur, uint id);
+
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
+        [DllImport("user32.dll")]
+        public static extern IntPtr LoadCursorFromFile(string lpFileName);
+        [DllImport("user32.dll")]
+        static extern bool GetCursorInfo(out CURSORINFO pci);
+        [DllImport("user32.dll")]
+        static extern IntPtr CopyIcon(IntPtr hIcon);
+
+        private static IntPtr cursorHandle;
+        private static POINT cursorPosition;
+        public static bool mouseVisible= false;
+        public static void HideMouse()
+        {
+            CURSORINFO pci;
+            pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
+            GetCursorInfo(out pci);
+            cursorPosition = pci.ptScreenPos;
+            cursorHandle = CopyIcon(pci.hCursor);
+
+            IntPtr cursor = LoadCursorFromFile(@"nocursor.cur");
+            SetSystemCursor(cursor, OCR_NORMAL);
+            mouseVisible = false;
+        }
+        public static void ShowMouse()
+        {
+            bool retval = SetSystemCursor(cursorHandle, OCR_NORMAL);
+            mouseVisible = true;
+        }
     }
 }
