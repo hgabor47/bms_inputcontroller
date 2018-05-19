@@ -30,7 +30,7 @@ namespace InputController
         static string shipUUID = "af675eb4-385e-4fda-a3a1-fdebd8901085";  //Input Controller UUID
         static BabylonMS.BabylonMS bms;
         static BabylonMS.BMSEventSessionParameter session=null;
-        static Point origo = new Point(-10000,-10000);
+        static Point origo = new Point(0,0);
 
         static MouseHooker hook;
         // static int sensitivity = 1; //1.best but slow, 10 is quite well
@@ -90,7 +90,7 @@ namespace InputController
             bms.OpenGate(false);//Client         
                                 //BabylonMS.Util.setPriorityUp();            
 
-            if (TEST_INPUTCONTROLLER)
+            if (!TEST_INPUTCONTROLLER)
             {
                 hook = new MouseHooker();
             }
