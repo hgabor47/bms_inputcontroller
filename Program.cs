@@ -134,7 +134,7 @@ namespace InputController
         }
         static void NewInputFrame(BabylonMS.BMSEventSessionParameter session)
         {
-            Console.WriteLine("NEW INPUT PACK");
+            if (debug) Console.WriteLine("NEW INPUT PACK");
             if (session.inputPack.FieldsCount() > 0)
             {
                 BabylonMS.BMSPack outputpack = new BabylonMS.BMSPack();
