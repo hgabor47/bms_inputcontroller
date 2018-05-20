@@ -90,9 +90,9 @@ namespace InputController
             bms.OpenGate(false);//Client         
                                 //BabylonMS.Util.setPriorityUp();            
 
-            if (!TEST_INPUTCONTROLLER)
+            if (TEST_INPUTCONTROLLER)
             {
-                hook = new MouseHooker();
+                hook = new MouseHooker(); //for test because the Connect activate the Mousehooker
             }
             
             Application.Run();
